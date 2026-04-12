@@ -1,0 +1,19 @@
+{
+  "name": "agentic-universe",
+  "version": "1.0.0",
+  "description": "Real-time agentic ecosystem simulation — plants, herbivores, carnivores",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "three": "^0.183.2",
+    "uuid": "^9.0.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}

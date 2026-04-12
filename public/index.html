@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentic Universe</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div id="sidebar-header">
+      <h1>Agentic Universe</h1>
+      <p>Ecosystem simulation</p>
+    </div>
+
+    <div id="sidebar-body">
+
+      <!-- Slots -->
+      <div>
+        <div class="section-title">Active Slots</div>
+        <div id="slots-area"></div>
+      </div>
+
+      <!-- Universe gallery -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div class="section-title" style="margin:0">Universes</div>
+          <button id="btn-new-universe" class="btn btn-sm btn-primary">+ New</button>
+        </div>
+        <div id="universe-list" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+
+      <!-- HUD (stats + sliders for active slot) -->
+      <div id="hud"></div>
+
+    </div>
+  </aside>
+
+  <!-- ── Main ────────────────────────────────────────────────────────────── -->
+  <main id="main">
+
+    <!-- Top bar -->
+    <div id="topbar">
+      <div id="conn-indicator" title="WebSocket connection"></div>
+      <span id="active-slot-badge">Slot 1</span>
+      <span id="active-universe-name">—</span>
+      <div class="spacer"></div>
+      <span id="tick-display">tick 0</span>
+      <button id="btn-start" class="btn btn-sm btn-secondary" disabled>Start</button>
+      <button id="btn-stop"  class="btn btn-sm btn-secondary">Stop</button>
+      <button id="btn-reset" class="btn btn-sm btn-secondary">Reset</button>
+    </div>
+
+    <!-- Canvas area -->
+    <div id="canvas-container"></div>
+
+  </main>
+
+</div>
+
+<!-- ── Universe Creator Modal ──────────────────────────────────────────────── -->
+<div id="creator-backdrop" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Universe Creator</h2>
+      <button class="modal-close" aria-label="Close">&#10005;</button>
+    </div>
+
+    <div class="modal-body">
+      <div id="creator-banner" class="banner error" style="display:none"></div>
+
+      <form id="creator-form" onsubmit="return false">
+        <!-- Meta -->
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label>Universe Name</label>
+            <input type="text" name="universe-name" placeholder="My Ecosystem" required>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Launch in Slot</label>
+            <select id="launch-slot-select">
+              <option value="1">Slot 1</option>
+              <option value="2">Slot 2</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="universe-description" rows="2" placeholder="Optional description&#8230;" style="resize:vertical"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>World Width (px)</label>
+            <input type="number" name="worldWidth" value="800" min="100" max="4000" step="50">
+          </div>
+          <div class="form-group">
+            <label>World Height (px)</label>
+            <input type="number" name="worldHeight" value="600" min="100" max="4000" step="50">
+          </div>
+          <div class="form-group">
+            <label>Tick Interval (ms)</label>
+            <input type="number" name="tickInterval" value="200" min="50" max="2000" step="50">
+          </div>
+        </div>
+
+        <!-- Agent types -->
+        <div>
+          <div class="section-title" style="margin-bottom:8px">Agent Types</div>
+          <div id="agent-types-container"></div>
+        </div>
+
+        <!-- Add agent type row -->
+        <div id="add-agent-type-row">
+          <select id="new-agent-role">
+            <option value="producer">Producer (e.g. Plants)</option>
+            <option value="consumer">Consumer (e.g. Herbivore)</option>
+            <option value="predator">Predator (e.g. Carnivore)</option>
+          </select>
+          <button id="btn-add-agent-type" type="button" class="btn btn-secondary btn-sm">+ Add Agent Type</button>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="modal-footer">
+      <button id="btn-cancel-creator" class="btn btn-secondary">Cancel</button>
+      <button id="btn-save-universe"  class="btn btn-primary">Save &amp; Launch</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

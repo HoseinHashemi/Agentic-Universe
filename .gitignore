@@ -1,0 +1,9 @@
+node_modules/
+*.db
+*.db-shm
+*.db-wal
+.env
+.DS_Store
+.claude/
+.superpowers/
+universe-data.json
