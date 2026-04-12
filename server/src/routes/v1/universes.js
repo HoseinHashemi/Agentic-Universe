@@ -47,7 +47,7 @@ router.put('/:id', (req, res) => {
 
   const u = db.saveUniverse({
     id,
-    name: body.name || config.name,
+    name: body.name || config.name || 'Untitled',
     description: body.description || config.description || existing.description,
     privacy: body.privacy || existing.privacy,
     owner_id: existing.owner_id,

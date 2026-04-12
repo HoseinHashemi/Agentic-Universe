@@ -8,7 +8,7 @@ const { ADMIN_ID } = require('./users');
  * Save (create or update) a universe.
  * data shape: { id?, name, description?, privacy?, config, owner_id?,
  *               forked_from_id?, forked_from_snapshot_id?, retention_days? }
- * config is the simulation parameter blob (worldWidth, agentTypes, etc.)
+ * config is an opaque JSON object (being replaced by manifest + knowledge_base in Task 2)
  */
 function saveUniverse(data) {
   const db = getDb();
@@ -22,7 +22,7 @@ function saveUniverse(data) {
          SET name = ?, description = ?, privacy = ?, config = ?, updated_at = ?
        WHERE id = ?
     `).run(
-      data.name || 'Unnamed',
+      data.name || 'Untitled',
       data.description || '',
       data.privacy || 'private',
       JSON.stringify(data.config),
@@ -37,7 +37,7 @@ function saveUniverse(data) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
-      data.name || 'Unnamed',
+      data.name || 'Untitled',
       data.description || '',
       data.privacy || 'private',
       data.owner_id || ADMIN_ID,
