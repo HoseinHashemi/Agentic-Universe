@@ -119,6 +119,26 @@ CREATE TABLE artifacts (
 );
 ```
 
+CREATE TABLE tools (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL UNIQUE,
+  category        TEXT NOT NULL,
+  description     TEXT NOT NULL,
+  input_schema    TEXT NOT NULL,   -- JSON
+  output_schema   TEXT NOT NULL,   -- JSON
+  implementation  TEXT NOT NULL,   -- JS code string, executed in sandbox
+  async           INTEGER NOT NULL DEFAULT 0,
+  sandboxed       INTEGER NOT NULL DEFAULT 1,
+  origin_universe TEXT REFERENCES universes(id) ON DELETE SET NULL,
+  origin_agent    TEXT REFERENCES agents(id) ON DELETE SET NULL,
+  created_at      INTEGER NOT NULL,
+  use_count       INTEGER NOT NULL DEFAULT 0
+);
+```
+
+Built-in tools (Phase 1) are seeded at server startup. Synthesised tools are added to this table at runtime and persist across restarts. `origin_universe` and `origin_agent` record who created the tool — foundation for future attribution and sharing.
+
+```sql
 **Key decisions:**
 - `agents.memory` is a rolling JSON blob trimmed to stay within LLM context limits (~2000 tokens worth of facts)
 - `events` table is the durable queue — Orchestrator pulls `pending`, marks `processing`, writes outputs, marks `done`
@@ -263,7 +283,15 @@ The Orchestrator looks up the tool in the Tool Registry, checks the agent's `too
 - Async tools: enqueue a `tool_result` event, agent is called again when result arrives
 - Sandboxed tools (code execution): run in an isolated Node.js `vm` context or Docker container
 
-**Tool Discovery** — agents can call `list_tools` to see what's available. They can call `request_tool` to ask the Orchestrator to enable a tool they don't currently have access to (creates a `tool_request` event visible to the user).
+**Tool Discovery** — agents can call `list_tools` to see what's available. They can call `request_tool` to ask the Orchestrator to enable a tool they don't currently have access to.
+
+**Self-Expanding Registry** — if an agent requests a tool that doesn't exist anywhere in the registry, the Orchestrator automatically triggers **tool synthesis**:
+1. Claude generates the tool implementation (code + schema + tests) from the agent's description
+2. The code is executed in the sandbox to verify it works
+3. The tool is registered permanently — available immediately to the requesting agent, and discoverable by all future agents across all universes
+4. The synthesis is logged as a `tool_created` event visible in the Dashboard
+
+Agents can also proactively create tools without being blocked — using `create_tool` with a description and optional example inputs/outputs. This makes every universe a contributor to a growing shared tool ecosystem. Tools built in one universe are reusable in all others. Over time the platform becomes more capable with every universe created, with no developer intervention required.
 
 ---
 
@@ -361,7 +389,8 @@ The Orchestrator looks up the tool in the Tool Registry, checks the agent's `too
 | Tool | Description | Phase |
 |------|-------------|-------|
 | `list_tools` | Discover available tools and their descriptions | 1 |
-| `request_tool` | Ask the Orchestrator to enable a tool | 1 |
+| `request_tool` | Request a tool by name — if it doesn't exist, triggers synthesis | 1 |
+| `create_tool` | Proactively define and synthesise a new tool from a description | 1 |
 | `reflect` | Generate a structured self-reflection on progress toward goals | 1 |
 | `propose_rule_change` | Suggest a change to the universe's interaction rules | 2 |
 | `create_skill` | Define a reusable behaviour pattern other agents can adopt | 4 |
@@ -370,13 +399,22 @@ The Orchestrator looks up the tool in the Tool Registry, checks the agent's `too
 
 ### Tool Implementation Notes
 
-**Phase 1 tools** are implemented in this sub-project. All others are registered in the Tool Registry with `implemented: false` — agents can see them and request them, but calling them returns a clear "tool not yet available" response rather than an error.
+**Phase 1 tools** are implemented in this sub-project. Tools from later phases are pre-registered in the catalog with `implemented: false` — agents can see them and request them. Calling an unimplemented tool triggers **auto-synthesis** rather than an error.
 
-**Code execution sandbox** (Phase 2): Node.js `vm` module for simple scripts; Docker container for full isolation when executing untrusted or long-running code. Each universe gets a persistent file system volume for `read_file`/`write_file`.
+**Tool synthesis flow:**
+1. Agent calls `request_tool` or `create_tool` with a description (and optionally example inputs/outputs)
+2. Orchestrator calls Claude with a code-generation prompt: write a Node.js function matching the described behaviour, return JSON `{ implementation, input_schema, output_schema, tests }`
+3. Implementation is run against the generated tests in the sandbox
+4. If tests pass: tool is saved to the `tools` table, permissions granted to requesting agent, `tool_created` event broadcast
+5. If tests fail: Claude is given the error and retried once; if still failing, agent receives a failure response describing what went wrong
 
-**External API calls** (Phase 2): agent provides URL, method, headers, body. The Orchestrator validates against a allowlist (configurable per universe). Rate limiting applied per universe.
+**Code execution sandbox** (active from Phase 1 for tool synthesis; exposed as `execute_code` tool in Phase 2): Node.js `vm` module with resource limits for simple scripts; Docker container for full isolation for long-running or untrusted code. Each universe gets a persistent file system volume.
 
-**Creative generation tools** (Phase 3): delegate to external model APIs (image generation, TTS, etc.). Results stored as binary artifacts in the file store, referenced by URL in the artifact record.
+**External API calls** (Phase 2): agent provides URL, method, headers, body. Rate limiting applied per universe.
+
+**Creative generation tools** (Phase 3): delegate to external model APIs. Results stored as binary artifacts, referenced by URL in the artifact record.
+
+**Tool ecosystem growth:** Every synthesised tool is globally available — not locked to the universe that created it. `use_count` tracks adoption. In a future sub-project, a tool discovery feed lets users browse and import tools created by other universes.
 
 ### Memory management
 After each agent call, `agent.memory` is updated. Memory is kept to ~2000 tokens. When trimming, oldest entries are summarised by Claude into a single "background" entry before being dropped. This happens asynchronously and does not block the event loop.
