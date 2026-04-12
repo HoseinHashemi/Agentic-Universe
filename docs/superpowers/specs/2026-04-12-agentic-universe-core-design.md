@@ -14,16 +14,18 @@ This sub-project delivers the core: creating a universe from a description, runn
 
 ---
 
-## What Is Out of Scope Here
+## What Is Out of Scope Here (implementation only — all are architecturally designed)
 
-- External tool integrations (web search, code execution sandbox, financial APIs)
-- Cross-universe agent communication
-- Universe sharing / discovery / marketplace
-- User authentication beyond the existing admin token stub
-- Flexible execution models (timers, scheduled triggers) — event-driven only for now
-- Billing / compute pricing
+- **Phase 2 tools:** code execution, web search, external APIs, databases, data analysis, diagrams
+- **Phase 3 tools:** image/animation/audio generation, app/website/game creation
+- **Phase 4 tools:** model training, deployment, email, cross-universe recruitment, skills
+- **Cross-universe agent communication** — protocol designed in sub-project 3
+- **Universe sharing / discovery / marketplace** — sub-project 4
+- **Multi-user auth** — sub-project 6
+- **Flexible execution models** (timers, scheduled triggers) — sub-project 5
+- **Billing / compute pricing** — sub-project 6
 
-These are planned for subsequent sub-projects.
+The Tool Registry, permission model, and action schema are designed here to accommodate all phases without re-architecting.
 
 ---
 
@@ -228,11 +230,153 @@ Tools available: [tool_permissions]
 }
 ```
 
-**Supported action types (this sub-project):**
-- `send_message` — to a specific agent or `all`
-- `create_artifact` — produces a named artifact (text, code, data, plan)
-- `spawn_agent` — `{ description: "a forensic expert who..." }` → triggers a new NL parse + agent creation
-- `update_memory` — merges content into agent's rolling memory (oldest entries trimmed)
+**Action format — every agent response action uses this shape:**
+```json
+{ "type": "<tool_name>", ...tool-specific fields }
+```
+The Orchestrator looks up the tool in the Tool Registry, checks the agent's `tool_permissions`, executes it, and returns the result to the agent in the next turn if needed (async tools) or immediately (sync tools).
+
+---
+
+## Tool System
+
+### Architecture
+
+**Tool Registry** — a server-side catalog of every available tool. Each entry defines:
+```js
+{
+  name: 'web_search',
+  category: 'research',
+  description: 'Search the internet for information',
+  input_schema: { query: 'string', max_results: 'number?' },
+  output_schema: { results: 'array' },
+  async: true,           // result returned in a follow-up event
+  sandboxed: false,
+  implementation_phase: 2   // 1 = Sub-project 1, 2 = Sub-project 2, etc.
+}
+```
+
+**Tool Permissions** — each agent's `tool_permissions` is an array of tool names. The manifest parse call assigns appropriate permissions based on the agent's role and the universe description. Universe creators can grant or revoke permissions at any time via NL instruction.
+
+**Tool Execution** — the Orchestrator executes tools between agent calls:
+- Sync tools: execute immediately, result included in next agent context
+- Async tools: enqueue a `tool_result` event, agent is called again when result arrives
+- Sandboxed tools (code execution): run in an isolated Node.js `vm` context or Docker container
+
+**Tool Discovery** — agents can call `list_tools` to see what's available. They can call `request_tool` to ask the Orchestrator to enable a tool they don't currently have access to (creates a `tool_request` event visible to the user).
+
+---
+
+### Full Tool Taxonomy
+
+#### Category 1 — Communication & Collaboration
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `send_message` | Send a message to a specific agent, all agents, or the user | 1 |
+| `broadcast` | Send a message to all agents + the user simultaneously | 1 |
+| `mention` | Notify a specific agent without blocking | 1 |
+| `request_feedback` | Ask a specific agent or the user to review something | 1 |
+| `delegate_task` | Assign a task to another agent with a description and deadline | 1 |
+
+#### Category 2 — Memory & Knowledge
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `update_memory` | Merge content into own rolling memory | 1 |
+| `read_knowledge_base` | Query the universe's shared knowledge base | 1 |
+| `write_knowledge_base` | Write or update a key in the shared knowledge base | 1 |
+| `search_knowledge_base` | Semantic search across the knowledge base | 2 |
+| `create_knowledge_entry` | Add a structured entry (fact, decision, finding) | 1 |
+
+#### Category 3 — Artifact Creation & Management
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `create_artifact` | Produce a named artifact (text, code, data, plan, report) | 1 |
+| `update_artifact` | Append to or revise an existing artifact (new version) | 1 |
+| `read_artifact` | Read an artifact produced by self or another agent | 1 |
+| `publish_artifact` | Mark an artifact as a final output (visible to user prominently) | 1 |
+| `link_artifacts` | Create a dependency/reference link between two artifacts | 2 |
+
+#### Category 4 — Agent Management
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `spawn_agent` | Create a new agent from a NL description | 1 |
+| `recruit_agent` | Bring an agent from another universe into this one | 3 |
+| `assign_role` | Change another agent's role or goals (if permitted) | 2 |
+| `dismiss_agent` | Remove an agent from the universe | 2 |
+| `modify_own_goals` | Update own goals based on new understanding | 1 |
+| `list_agents` | Get list of all active agents in the universe | 1 |
+
+#### Category 5 — Code & Computation
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `write_code` | Produce a code artifact in any language | 1 |
+| `execute_code` | Run code in an isolated sandbox, capture stdout/stderr/result | 2 |
+| `create_simulation` | Define a simulation with parameters and rules | 2 |
+| `run_simulation` | Execute a simulation, return results as artifact | 2 |
+| `create_database` | Create an in-universe SQLite database with a schema | 2 |
+| `query_database` | Run SQL against an in-universe database | 2 |
+| `run_formula` | Evaluate a mathematical formula or expression | 2 |
+| `create_dataset` | Define and populate a structured dataset | 2 |
+| `analyze_data` | Run statistical analysis on a dataset | 2 |
+| `train_model` | Fine-tune or prompt-engineer a model on a dataset | 4 |
+
+#### Category 6 — Research & Information
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `web_search` | Search the internet | 2 |
+| `fetch_url` | Fetch and extract content from a URL | 2 |
+| `search_papers` | Search academic publications (arXiv, Semantic Scholar) | 2 |
+| `read_paper` | Fetch and summarise an academic paper | 2 |
+| `get_news` | Fetch recent news on a topic | 2 |
+
+#### Category 7 — Creative & Media Generation
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `generate_image` | Generate an image from a text description | 3 |
+| `create_animation` | Generate an animated sequence or video | 3 |
+| `generate_audio` | Synthesise speech or music from description | 3 |
+| `create_game_world` | Scaffold a playable game or interactive simulation | 3 |
+| `create_3d_scene` | Generate a 3D environment description / Three.js scene | 3 |
+| `generate_diagram` | Create architecture, flow, or data diagrams | 2 |
+
+#### Category 8 — App & Web Development
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `create_app` | Scaffold a full application (frontend + backend) | 3 |
+| `create_website` | Generate a static or dynamic website | 3 |
+| `create_api` | Define and implement an API endpoint | 3 |
+| `deploy` | Deploy an artifact to a hosting environment | 4 |
+| `create_ui_component` | Generate a React/HTML component | 3 |
+
+#### Category 9 — External Integrations
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `call_api` | Make an authenticated HTTP request to an external API | 2 |
+| `read_file` | Read a file from the universe's file store | 2 |
+| `write_file` | Write a file to the universe's file store | 2 |
+| `send_email` | Send an email via configured provider | 4 |
+| `call_webhook` | POST to an external webhook URL | 2 |
+
+#### Category 10 — Meta & Self-Improvement
+| Tool | Description | Phase |
+|------|-------------|-------|
+| `list_tools` | Discover available tools and their descriptions | 1 |
+| `request_tool` | Ask the Orchestrator to enable a tool | 1 |
+| `reflect` | Generate a structured self-reflection on progress toward goals | 1 |
+| `propose_rule_change` | Suggest a change to the universe's interaction rules | 2 |
+| `create_skill` | Define a reusable behaviour pattern other agents can adopt | 4 |
+
+---
+
+### Tool Implementation Notes
+
+**Phase 1 tools** are implemented in this sub-project. All others are registered in the Tool Registry with `implemented: false` — agents can see them and request them, but calling them returns a clear "tool not yet available" response rather than an error.
+
+**Code execution sandbox** (Phase 2): Node.js `vm` module for simple scripts; Docker container for full isolation when executing untrusted or long-running code. Each universe gets a persistent file system volume for `read_file`/`write_file`.
+
+**External API calls** (Phase 2): agent provides URL, method, headers, body. The Orchestrator validates against a allowlist (configurable per universe). Rate limiting applied per universe.
+
+**Creative generation tools** (Phase 3): delegate to external model APIs (image generation, TTS, etc.). Results stored as binary artifacts in the file store, referenced by URL in the artifact record.
 
 ### Memory management
 After each agent call, `agent.memory` is updated. Memory is kept to ~2000 tokens. When trimming, oldest entries are summarised by Claude into a single "background" entry before being dropped. This happens asynchronously and does not block the event loop.
@@ -357,10 +501,14 @@ Three panels on the same page, tabs to switch. All driven by the same WebSocket 
 
 ---
 
-## Future Sub-projects (not in scope here)
+## Sub-project Roadmap
 
-- **Sub-project 2:** Agent tools — web search, code execution sandbox, external API integrations
-- **Sub-project 3:** Cross-universe agent communication protocol
-- **Sub-project 4:** Social layer — universe sharing, discovery, forking attribution
-- **Sub-project 5:** Flexible execution — timers, scheduled triggers, continuous mode
-- **Sub-project 6:** Multi-user auth, compute pricing tiers
+| Sub-project | Scope |
+|-------------|-------|
+| **1 (this)** | Universe + Agent Core: NL creation, Orchestrator, Phase 1 tools, three-panel UI |
+| **2** | Phase 2 tools: code execution sandbox, web search, external APIs, databases, data analysis, file store, diagrams |
+| **3** | Phase 3 tools: image/audio/animation generation, app/website/game scaffolding; cross-universe agent communication protocol |
+| **4** | Social layer: universe sharing, discovery feed, forking attribution, public/private visibility |
+| **5** | Flexible execution: timers, scheduled triggers, continuous mode per universe |
+| **6** | Multi-user auth (real accounts, OAuth), compute usage tracking, pricing tiers |
+| **7** | Phase 4 tools: model training, deployment, agent skills marketplace, cross-universe recruitment |
