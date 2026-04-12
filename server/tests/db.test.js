@@ -46,3 +46,56 @@ test('events table has correct indexes', () => {
   assert.ok(indexes.includes('idx_events_universe_status'));
   assert.ok(indexes.includes('idx_messages_universe'));
 });
+
+test('agents CRUD', () => {
+  const db = getDb();
+  // seed a user and universe needed for FK constraints
+  db.prepare('INSERT OR IGNORE INTO users (id,username,session_token,created_at) VALUES (?,?,?,?)').run('u1','admin','tok',Date.now());
+  db.prepare('INSERT OR IGNORE INTO universes (id,name,owner_id,config,created_at,updated_at) VALUES (?,?,?,?,?,?)').run('univ1','Test','u1','{}',Date.now(),Date.now());
+
+  const { createAgent, getAgent, listAgents, updateAgentStatus, updateAgentMemory } = require('../src/db/agents');
+
+  const agent = createAgent({
+    universe_id: 'univ1',
+    name: 'Sam',
+    role: 'Detective',
+    goals: 'Solve cases',
+    personality: 'Cynical',
+    type: 'llm',
+    tool_permissions: ['send_message'],
+  });
+  assert.ok(agent.id.startsWith('ag_'));
+  assert.equal(agent.name, 'Sam');
+  assert.deepEqual(agent.tool_permissions, ['send_message']);
+
+  const fetched = getAgent(agent.id);
+  assert.equal(fetched.role, 'Detective');
+
+  const list = listAgents('univ1');
+  assert.equal(list.length, 1);
+
+  updateAgentStatus(agent.id, 'active');
+  assert.equal(getAgent(agent.id).status, 'active');
+
+  updateAgentMemory(agent.id, { last_case: 'Doe' });
+  assert.equal(getAgent(agent.id).memory.last_case, 'Doe');
+});
+
+test('sessions CRUD', () => {
+  const { createSession, getSession, getActiveSession, stopSession } = require('../src/db/sessions');
+
+  const sess = createSession('univ1');
+  assert.ok(sess.id.startsWith('sess_'));
+  assert.equal(sess.status, 'running');
+  assert.equal(sess.universe_id, 'univ1');
+
+  const fetched = getSession(sess.id);
+  assert.equal(fetched.id, sess.id);
+
+  const active = getActiveSession('univ1');
+  assert.equal(active.id, sess.id);
+
+  stopSession(sess.id);
+  assert.equal(getSession(sess.id).status, 'stopped');
+  assert.equal(getActiveSession('univ1'), null);
+});
