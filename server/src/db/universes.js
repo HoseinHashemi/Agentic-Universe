@@ -6,9 +6,9 @@ const { ADMIN_ID } = require('./users');
 
 /**
  * Save (create or update) a universe.
- * data shape: { id?, name, description?, privacy?, config, owner_id?,
- *               forked_from_id?, forked_from_snapshot_id?, retention_days? }
- * config is an opaque JSON object (being replaced by manifest + knowledge_base in Task 2)
+ * data shape: { id?, name, description?, privacy?, manifest?, knowledge_base?, config?, owner_id?, forked_from_id? }
+ * manifest and knowledge_base are JSON objects stored as TEXT.
+ * config is an opaque JSON object (legacy field, kept for compatibility).
  */
 function saveUniverse(data) {
   const db = getDb();
@@ -19,13 +19,16 @@ function saveUniverse(data) {
   if (existing) {
     db.prepare(`
       UPDATE universes
-         SET name = ?, description = ?, privacy = ?, config = ?, updated_at = ?
+         SET name = ?, description = ?, privacy = ?, manifest = ?,
+             knowledge_base = ?, config = ?, updated_at = ?
        WHERE id = ?
     `).run(
       data.name || 'Untitled',
       data.description || '',
       data.privacy || 'private',
-      JSON.stringify(data.config),
+      data.manifest != null ? JSON.stringify(data.manifest) : null,
+      data.knowledge_base != null ? JSON.stringify(data.knowledge_base) : null,
+      JSON.stringify(data.config || {}),
       now,
       id
     );
@@ -33,7 +36,7 @@ function saveUniverse(data) {
     db.prepare(`
       INSERT INTO universes
         (id, name, description, privacy, owner_id, forked_from_id,
-         forked_from_snapshot_id, retention_days, config, created_at, updated_at)
+         manifest, knowledge_base, config, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
@@ -42,9 +45,9 @@ function saveUniverse(data) {
       data.privacy || 'private',
       data.owner_id || ADMIN_ID,
       data.forked_from_id || null,
-      data.forked_from_snapshot_id || null,
-      data.retention_days || null,
-      JSON.stringify(data.config),
+      data.manifest != null ? JSON.stringify(data.manifest) : null,
+      data.knowledge_base != null ? JSON.stringify(data.knowledge_base) : null,
+      JSON.stringify(data.config || {}),
       data.created_at || now,
       now
     );
@@ -66,15 +69,17 @@ function listUniverses() {
 }
 
 function deleteUniverse(id) {
-  const db = getDb();
-  // Clear forked_from_snapshot_id on child universes before deleting snapshots
-  db.prepare('UPDATE universes SET forked_from_snapshot_id = NULL WHERE forked_from_id = ?').run(id);
-  const result = db.prepare('DELETE FROM universes WHERE id = ?').run(id);
+  const result = getDb().prepare('DELETE FROM universes WHERE id = ?').run(id);
   return result.changes > 0;
 }
 
 function _deserialize(row) {
-  return { ...row, config: JSON.parse(row.config) };
+  return {
+    ...row,
+    manifest: row.manifest ? JSON.parse(row.manifest) : null,
+    knowledge_base: row.knowledge_base ? JSON.parse(row.knowledge_base) : {},
+    config: row.config ? JSON.parse(row.config) : {},
+  };
 }
 
 module.exports = { saveUniverse, getUniverse, listUniverses, deleteUniverse };

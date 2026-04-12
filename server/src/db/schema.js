@@ -6,6 +6,8 @@ const path = require('path');
 const DB_PATH = process.env.DB_PATH ||
   path.join(__dirname, '../../../..', 'universe.db');
 
+// Singleton DB connection. DB_PATH env var must be set BEFORE the first require() of this module.
+// Use closeDb() + delete require.cache in tests if multiple test files need separate DBs.
 let _db = null;
 
 function getDb() {
@@ -70,7 +72,7 @@ function _createTables(db) {
     CREATE TABLE IF NOT EXISTS events (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       universe_id  TEXT NOT NULL REFERENCES universes(id) ON DELETE CASCADE,
-      session_id   TEXT REFERENCES sessions(id),
+      session_id   TEXT REFERENCES sessions(id) ON DELETE SET NULL,
       type         TEXT NOT NULL,
       source       TEXT NOT NULL,
       payload      TEXT NOT NULL,
