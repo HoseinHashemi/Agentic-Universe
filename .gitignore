@@ -7,3 +7,4 @@ node_modules/
 .claude/
 .superpowers/
 universe-data.json
+client/dist/
