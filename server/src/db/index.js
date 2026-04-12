@@ -1,8 +1,9 @@
 'use strict';
 
+const { saveUniverse, getUniverse, listUniverses, deleteUniverse } = require('./universes');
+const { ensureAdminUser, getAdminToken, ADMIN_ID } = require('./users');
+
 module.exports = {
-  ...require('./universes'),
-  ...require('./snapshots'),
-  ...require('./tickStats'),
-  ...require('./users'),
+  saveUniverse, getUniverse, listUniverses, deleteUniverse,
+  ensureAdminUser, getAdminToken, ADMIN_ID,
 };
