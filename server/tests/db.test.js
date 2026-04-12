@@ -99,3 +99,83 @@ test('sessions CRUD', () => {
   assert.equal(getSession(sess.id).status, 'stopped');
   assert.equal(getActiveSession('univ1'), null);
 });
+
+test('events queue', () => {
+  const { enqueueEvent, getEvent, claimEvent, markEventDone, nextPendingEvent, listEvents } = require('../src/db/events');
+
+  const ev = enqueueEvent({
+    universe_id: 'univ1',
+    session_id: null,
+    type: 'user_message',
+    source: 'user',
+    payload: { content: 'Hello' },
+  });
+  assert.ok(ev.id > 0);
+  assert.equal(ev.status, 'pending');
+  assert.deepEqual(ev.payload, { content: 'Hello' });
+
+  const next = nextPendingEvent('univ1');
+  assert.equal(next.id, ev.id);
+
+  claimEvent(ev.id);
+  assert.equal(getEvent(ev.id).status, 'processing');
+  assert.equal(nextPendingEvent('univ1'), null); // claimed, not pending
+
+  markEventDone(ev.id);
+  const events = listEvents('univ1', { status: 'done' });
+  assert.equal(events.length, 1);
+  assert.ok(events[0].processed_at > 0);
+});
+
+test('messages', () => {
+  const { createMessage, listMessages } = require('../src/db/messages');
+
+  createMessage({ universe_id: 'univ1', from_id: 'user', to_id: 'all', content: 'Hi' });
+  createMessage({ universe_id: 'univ1', from_id: 'user', to_id: 'all', content: 'World' });
+  const msgs = listMessages('univ1', { limit: 10 });
+  assert.equal(msgs.length, 2);
+  assert.equal(msgs[0].content, 'Hi');
+  assert.equal(msgs[1].content, 'World');
+});
+
+test('artifacts', () => {
+  const { createArtifact, getArtifact, updateArtifact, listArtifacts } = require('../src/db/artifacts');
+
+  const art = createArtifact({ universe_id: 'univ1', agent_id: null, name: 'Report', type: 'text', content: 'Body' });
+  assert.ok(art.id > 0);
+  assert.equal(art.name, 'Report');
+  assert.equal(art.version, 1);
+
+  const updated = updateArtifact(art.id, 'New Body');
+  assert.equal(updated.version, 2);
+  assert.equal(updated.content, 'New Body');
+
+  const list = listArtifacts('univ1');
+  assert.equal(list.length, 1);
+});
+
+test('tools registry', () => {
+  const { saveTool, getTool, listTools, incrementUseCount } = require('../src/db/tools');
+
+  const tool = saveTool({
+    name: 'send_message',
+    category: 'communication',
+    description: 'Send a message',
+    input_schema: { to: 'string', content: 'string' },
+    output_schema: { message_id: 'number' },
+    implementation: '',
+    implemented: true,
+  });
+  assert.equal(tool.name, 'send_message');
+  assert.ok(tool.implemented);
+  assert.deepEqual(tool.input_schema, { to: 'string', content: 'string' });
+
+  const fetched = getTool('send_message');
+  assert.equal(fetched.category, 'communication');
+
+  const all = listTools();
+  assert.equal(all.length, 1);
+
+  incrementUseCount('send_message');
+  assert.equal(getTool('send_message').use_count, 1);
+});
