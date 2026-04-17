@@ -36,6 +36,12 @@ if (fs.existsSync(clientDist)) {
 }
 
 app.use('/api/v1/universes', auth, universeRoutes);
+app.use('/api/v1/universes/:id/session',   auth, require('./routes/v1/sessions'));
+app.use('/api/v1/universes/:id/message',   auth, require('./routes/v1/messages'));
+app.use('/api/v1/universes/:id/messages',  auth, require('./routes/v1/messages'));
+app.use('/api/v1/universes/:id/agents',    auth, require('./routes/v1/agents'));
+app.use('/api/v1/universes/:id/artifacts', auth, require('./routes/v1/artifacts'));
+app.use('/api/v1/universes/:id/events',    auth, require('./routes/v1/eventsRoute'));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
