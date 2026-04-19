@@ -30,14 +30,16 @@ Rules:
 - Create 2-5 agents appropriate to the universe
 - Each agent gets the minimal set of tool_permissions appropriate for their role
 - Always include at least one initial_event so agents have something to react to
-- tool_permissions must be chosen from: send_message, broadcast, create_artifact, update_artifact, read_artifact, publish_artifact, update_memory, read_knowledge_base, write_knowledge_base, create_knowledge_entry, spawn_agent, modify_own_goals, list_agents, list_tools, request_tool, create_tool, reflect, write_code, delegate_task`;
+- tool_permissions must be chosen from: send_message, broadcast, create_artifact, update_artifact, read_artifact, publish_artifact, update_memory, read_knowledge_base, write_knowledge_base, create_knowledge_entry, spawn_agent, modify_own_goals, list_agents, list_tools, request_tool, create_tool, reflect, write_code, delegate_task
+- Keep all string values SHORT: summary ≤ 3 sentences, goals ≤ 2 sentences, personality ≤ 1 sentence, initial_memory ≤ 2 sentences, interaction_rules ≤ 2 sentences
+- knowledge_base_seed must be a flat object with at most 5 short string values`;
 
 async function parseUniverse(description) {
   const text = await callClaude({
     model: OPUS,
     system: SYSTEM,
     messages: [{ role: 'user', content: description }],
-    max_tokens: 2048,
+    max_tokens: 4096,
   });
 
   let manifest;
@@ -67,7 +69,7 @@ async function patchUniverseManifest(currentManifest, instruction) {
       role: 'user',
       content: `Current manifest:\n${JSON.stringify(currentManifest, null, 2)}\n\nInstruction: ${instruction}`,
     }],
-    max_tokens: 2048,
+    max_tokens: 4096,
   });
 
   const cleaned = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
