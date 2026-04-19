@@ -23,6 +23,9 @@ async function callClaude({ model = OPUS, system, messages, max_tokens = 4096 })
     system,
     messages,
   });
+  if (response.stop_reason === 'max_tokens') {
+    console.warn(`[claude] max_tokens hit (${max_tokens}) — response truncated. model=${model}`);
+  }
   return response.content[0].text;
 }
 
