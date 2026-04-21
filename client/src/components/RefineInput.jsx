@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useUniverseStore } from '../store/universeStore';
 import { universes as universesApi } from '../api/universes';
+import { agents as agentsApi } from '../api/agents';
 
 export default function RefineInput() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
-  const { activeUniverseId } = useUniverseStore();
+  const { activeUniverseId, setAgents } = useUniverseStore();
 
   async function submit(e) {
     e.preventDefault();
@@ -13,12 +14,10 @@ export default function RefineInput() {
     if (!instruction || loading) return;
     setLoading(true);
     try {
-      const data = await universesApi.refine(activeUniverseId, { instruction });
-      // Merge new agents into store
-      if (data.new_agents?.length) {
-        const store = useUniverseStore.getState();
-        useUniverseStore.setState({ agents: [...store.agents, ...data.new_agents] });
-      }
+      await universesApi.refine(activeUniverseId, { instruction });
+      // Always reload the full agent list so the visual panel stays in sync
+      const { agents } = await agentsApi.list(activeUniverseId);
+      setAgents(agents || []);
       setText('');
     } catch (err) {
       alert(err.message);

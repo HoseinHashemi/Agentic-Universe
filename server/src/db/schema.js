@@ -16,11 +16,23 @@ function getDb() {
   _db.exec('PRAGMA journal_mode = WAL');
   _db.exec('PRAGMA foreign_keys = ON');
   _createTables(_db);
+  _migrate(_db);
   return _db;
 }
 
 function closeDb() {
   if (_db) { _db.close(); _db = null; }
+}
+
+function _migrate(db) {
+  // Add columns introduced after initial schema — safe to re-run (errors are caught).
+  const migrations = [
+    'ALTER TABLE universes ADD COLUMN manifest       TEXT',
+    'ALTER TABLE universes ADD COLUMN knowledge_base TEXT',
+  ];
+  for (const sql of migrations) {
+    try { db.exec(sql); } catch (_) { /* column already exists */ }
+  }
 }
 
 function _createTables(db) {

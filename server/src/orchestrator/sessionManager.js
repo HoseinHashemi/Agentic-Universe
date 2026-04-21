@@ -23,12 +23,33 @@ function stopSession(universeId) {
   return true;
 }
 
+function pauseSession(universeId) {
+  const orch = _active.get(universeId);
+  if (!orch) return false;
+  orch.pause();
+  return true;
+}
+
+function resumeSession(universeId) {
+  const orch = _active.get(universeId);
+  if (!orch) return false;
+  orch.resume();
+  return true;
+}
+
 function getSession(universeId) {
   return _active.get(universeId) || null;
 }
 
 function isRunning(universeId) {
-  return _active.has(universeId);
+  const orch = _active.get(universeId);
+  return !!(orch && orch._running);
 }
 
-module.exports = { startSession, stopSession, getSession, isRunning };
+function getStatus(universeId) {
+  const orch = _active.get(universeId);
+  if (!orch) return 'stopped';
+  return orch.status;
+}
+
+module.exports = { startSession, stopSession, pauseSession, resumeSession, getSession, isRunning, getStatus };

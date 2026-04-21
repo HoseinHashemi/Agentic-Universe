@@ -8,7 +8,7 @@ export default function UniverseProvider({ children }) {
 
   const {
     setConnected, appendMessage, appendAgent, appendArtifact,
-    appendEvent, setThinking, clearThinking,
+    appendEvent, setThinking, clearThinking, setSessionStatus,
   } = useUniverseStore();
 
   function connect() {
@@ -61,6 +61,9 @@ export default function UniverseProvider({ children }) {
               ? { ...s.activeUniverse, knowledge_base: { ...s.activeUniverse.knowledge_base, ...payload.patch } }
               : s.activeUniverse,
           }));
+          break;
+        case 'session_status':
+          setSessionStatus(payload.status);
           break;
         default:
           break;

@@ -35,6 +35,24 @@ class Orchestrator extends EventEmitter {
     console.log(`[Orchestrator] stopped for universe ${this.universeId}`);
   }
 
+  pause() {
+    this._running = false;
+    if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+    broadcast('session_status', { universeId: this.universeId, status: 'paused' });
+    console.log(`[Orchestrator] paused for universe ${this.universeId}`);
+  }
+
+  resume() {
+    this._running = true;
+    this._schedule();
+    broadcast('session_status', { universeId: this.universeId, status: 'running' });
+    console.log(`[Orchestrator] resumed for universe ${this.universeId}`);
+  }
+
+  get status() {
+    return this._running ? 'running' : 'paused';
+  }
+
   _schedule() {
     if (!this._running) return;
     this._timer = setTimeout(() => this._tick(), POLL_INTERVAL_MS);

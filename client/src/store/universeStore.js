@@ -13,13 +13,14 @@ export const useUniverseStore = create((set, get) => ({
   events: [],
   artifacts: [],
   session: null,
-  thinking: {},         // { [agentId]: agentName } — agents currently thinking
+  sessionStatus: 'stopped',  // 'running' | 'paused' | 'stopped'
+  thinking: {},
 
   setActiveUniverse: ({ universe, agents, session }) =>
     set({ activeUniverseId: universe.id, activeUniverse: universe, agents: agents || [], session }),
 
   clearActiveUniverse: () =>
-    set({ activeUniverseId: null, activeUniverse: null, agents: [], messages: [], events: [], artifacts: [], session: null }),
+    set({ activeUniverseId: null, activeUniverse: null, agents: [], messages: [], events: [], artifacts: [], session: null, sessionStatus: 'stopped', thinking: {} }),
 
   setMessages:    (messages)  => set({ messages }),
   appendMessage:  (msg)       => set(s => ({ messages: [...s.messages, msg] })),
@@ -34,11 +35,13 @@ export const useUniverseStore = create((set, get) => ({
   clearThinking: (agentId) =>
     set(s => { const t = { ...s.thinking }; delete t[agentId]; return { thinking: t }; }),
 
+  setSessionStatus: (sessionStatus) => set({ sessionStatus }),
+
   // WebSocket connection state
   connected: false,
   setConnected: (connected) => set({ connected }),
 
   // Active panel
-  panel: 'chat',   // 'chat' | 'visual' | 'dashboard'
+  panel: 'chat',
   setPanel: (panel) => set({ panel }),
 }));

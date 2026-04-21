@@ -62,10 +62,31 @@ attachWebSocket(httpServer);
 httpServer.listen(PORT, () => {
   console.log(`[server] http://localhost:${PORT}`);
   console.log(`[server] ws://localhost:${PORT}/ws`);
+  _resumeActiveSessions();
 });
 
 process.on('SIGTERM', shutdown);
 process.on('SIGINT',  shutdown);
+
+function _resumeActiveSessions() {
+  const sessionMgr = require('./orchestrator/sessionManager');
+  const { getDb }  = require('./db/schema');
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT * FROM sessions WHERE status = 'running' ORDER BY started_at DESC"
+  ).all();
+  const seen = new Set();
+  for (const sess of rows) {
+    if (seen.has(sess.universe_id)) continue;
+    seen.add(sess.universe_id);
+    try {
+      sessionMgr.startSession(sess.universe_id, sess.id);
+      console.log(`[server] resumed session ${sess.id} for universe ${sess.universe_id}`);
+    } catch (err) {
+      console.error(`[server] failed to resume session ${sess.id}:`, err.message);
+    }
+  }
+}
 
 function shutdown() {
   console.log('\n[server] shutting down…');
